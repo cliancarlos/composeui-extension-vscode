@@ -16,6 +16,10 @@
       {
         "command": "compose-ui-helper.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "extension.organizeTailwindClasses",
+        "title": "Organize Tailwind Classes in ComposeUI Components"
       }
     ]
   },
