@@ -1,77 +1,66 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
+import { formatTailwindClasses } from "./formatter";
 
-function processTailwindClasses(text) {
-  // Procure por componentes com o atributo isComposeUI
-  const composeUIComponentRegex = /<[A-Za-z]+\s+[^>]*isComposeUI[^>]*>/g;
+async function applyChanges(
+  document: vscode.TextDocument,
+  edits: TextEdit[]
+): Promise<void> {
+  const editor = await vscode.window.showTextDocument(document);
+  const totalRange = new vscode.Range(
+    document.positionAt(0),
+    document.positionAt(document.getText().length)
+  );
 
-  let newText = text;
-  let match;
+  // Create new text by applying all edits
+  const newText = edits.reduce((text, edit) => {
+    console.dir(edit);
+    const editRange = new vscode.Range(
+      document.positionAt(edit.start),
+      document.positionAt(edit.end)
+    );
+    return text.slice(0, edit.start) + edit.text + text.slice(edit.end);
+  }, document.getText());
 
-  while ((match = composeUIComponentRegex.exec(text)) !== null) {
-    const componentString = match[0];
-
-    // Procure pelas classes Tailwind no atributo className
-    const classNameRegex = /className="([^"]*)"/;
-    const classNameMatch = componentString.match(classNameRegex);
-
-    if (classNameMatch) {
-      const classNames = classNameMatch[1];
-
-      // Divida as classes e reorganize-as conforme necessário
-      // (adapte a lógica de reorganização às suas necessidades específicas)
-      const organizedClassNames = reorganizeClassNames(classNames);
-
-      // Substitua o atributo className pelas classes reorganizadas
-      const newComponentString = componentString.replace(
-        classNameMatch[0],
-        `size="${organizedClassNames.size}" bg="${organizedClassNames.bg}"`
-      );
-
-      newText = newText.replace(componentString, newComponentString);
-    }
-  }
-
-  return newText;
+  // Replace entire text with new text
+  editor.edit((edit) => {
+    edit.replace(totalRange, newText);
+  });
 }
 
-function reorganizeClassNames(classNames) {
-  const sizeRegex = /(w-[0-9]+(?:\.[0-9]+)?\s+h-[0-9]+(?:\.[0-9]+)?)/;
-  const bgRegex = /(bg-[\w-]+(?:\s+dark:bg-[\w-]+)?)/;
+function registerOnSaveHandler(context: vscode.ExtensionContext) {
+  context.subscriptions.push(
+    vscode.workspace.onWillSaveTextDocument(async (e) => {
+      console.log("Clicou em salvar");
+      const document = e.document;
+      const languageId = document.languageId;
 
-  const sizeMatch = classNames.match(sizeRegex);
-  const bgMatch = classNames.match(bgRegex);
+      // Verifique se o arquivo é JavaScript, TypeScript, ou TypeScript React antes de aplicar a formatação
+      if (
+        languageId === "javascript" ||
+        languageId === "typescript" ||
+        languageId === "typescriptreact"
+      ) {
+        const edits = formatTailwindClasses(document.getText(), document);
 
-  return {
-    size: sizeMatch ? sizeMatch[1] : "",
-    bg: bgMatch ? bgMatch[1] : "",
-  };
+        if (edits.length > 0) {
+          console.log("vai aplicar changes");
+          e.waitUntil(applyChanges(document, edits));
+        }
+      }
+    })
+  );
 }
 
-const example = () => {
-  const document = vscode.window;
-  //const text = document.getText();
-  console.log(document.activeTextEditor.document.getText());
-};
-
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
   console.log(
     'Congratulations, your extension "compose-ui-helper" is now active!'
   );
 
-  // The command has been defined in the package.json file
-  // Now provide the implementation of the command with registerCommand
-  // The commandId parameter must match the command field in package.json
+  registerOnSaveHandler(context);
+
   let disposable = vscode.commands.registerCommand(
     "compose-ui-helper.helloWorld",
     () => {
-      // The code you place here will be executed every time your command is executed
-      // Display a message box to the user
       vscode.window.showInformationMessage(
         "Hello World from Compose UI Helper!"
       );
@@ -79,14 +68,6 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(disposable);
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand("extension.organizeTailwindClasses", () => {
-      // Implemente a lógica para chamar a função processTailwindClasses aqui
-      example();
-    })
-  );
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}
