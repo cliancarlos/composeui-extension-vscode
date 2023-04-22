@@ -3,7 +3,7 @@ import { formatTailwindClasses } from "./formatter";
 
 async function applyChanges(
   document: vscode.TextDocument,
-  edits: TextEdit[]
+  edits: vscode.TextEdit[]
 ): Promise<void> {
   const editor = await vscode.window.showTextDocument(document);
   const totalRange = new vscode.Range(
@@ -14,11 +14,10 @@ async function applyChanges(
   // Create new text by applying all edits
   const newText = edits.reduce((text, edit) => {
     console.dir(edit);
-    const editRange = new vscode.Range(
-      document.positionAt(edit.start),
-      document.positionAt(edit.end)
-    );
-    return text.slice(0, edit.start) + edit.text + text.slice(edit.end);
+    const editRange = edit.range;
+    const editStart = document.offsetAt(editRange.start);
+    const editEnd = document.offsetAt(editRange.end);
+    return text.slice(0, editStart) + edit.newText + text.slice(editEnd);
   }, document.getText());
 
   // Replace entire text with new text

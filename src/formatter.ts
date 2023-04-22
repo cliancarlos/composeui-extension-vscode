@@ -19,15 +19,16 @@ type TailwindClassMap = {
   [key: string]: string[];
 };
 
-interface TextEdit {
-  range: vscode.Range;
-  newText: string;
+interface Transformation {
+  start: number;
+  end: number;
+  text: string;
 }
 
 export function formatTailwindClasses(
   code: string,
   document: vscode.TextDocument
-): TextEdit[] {
+): vscode.TextEdit[] {
   const jsxParser = acorn.Parser.extend(jsx());
 
   const tailwindClassMap: TailwindClassMap = {
@@ -184,7 +185,7 @@ export function formatTailwindClasses(
 
   try {
     babelTraverse.default(ast, {
-      enter(path) {
+      enter(path: any) {
         if (path.isJSXElement()) {
           jsxElements.push(path.node);
         }
@@ -196,10 +197,21 @@ export function formatTailwindClasses(
     // return [];
   }
 
-  const allTransformations = jsxElements
+  const allTransformations: Transformation[] = jsxElements
     .map(transformJSXElement)
     .flat()
-    .filter((transformation) => transformation !== null);
+    .filter(
+      (transformation): transformation is Transformation =>
+        transformation !== null
+    );
 
-  return allTransformations;
+  return allTransformations
+    .filter((transformation) => transformation !== null)
+    .map((transformation) => {
+      const range = new vscode.Range(
+        document.positionAt(transformation.start),
+        document.positionAt(transformation.end)
+      );
+      return new vscode.TextEdit(range, transformation.text);
+    });
 }
